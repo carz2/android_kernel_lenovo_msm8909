@@ -135,6 +135,11 @@ static char bus_clkname[USB_NUM_BUS_CLOCKS][20] = {"bimc_clk", "snoc_clk",
 						"pcnoc_clk"};
 static bool bus_clk_rate_set;
 
+/* added by zhangrui for qcom OTG patch HQ01982382 20160705 begin */
+#include <linux/clk/msm-clk-provider.h>
+static DEFINE_MUTEX(oem_mutex);
+/* added by zhangrui for qcom OTG patch HQ01982382 20160705 end */
+
 static void
 msm_otg_dbg_log_event(struct usb_phy *phy, char *event, int d1, int d2)
 {
@@ -1257,7 +1262,10 @@ static irqreturn_t msm_otg_phy_irq_handler(int irq, void *data)
 			pm_request_resume(motg->phy.dev);
 	} else {
 		pr_debug("PHY ID IRQ outside LPM\n");
-		msm_id_status_w(&motg->id_status_work.work);
+		/* added by zhangrui for qcom OTG patch HQ01982382 20160705 begin */
+		schedule_delayed_work(&motg->id_status_work, 0);
+		// msm_id_status_w(&motg->id_status_work.work);
+		/* added by zhangrui for qcom OTG patch HQ01982382 20160705 end */
 	}
 
 	return IRQ_HANDLED;
@@ -1521,6 +1529,13 @@ phcd_retry:
 
 	/* Ensure that above operation is completed before turning off clocks */
 	mb();
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 begin */
+	mutex_lock(&oem_mutex);
+	printk("[oem][usb][suspend+] prepare_count=%d, count=%d\n",
+		motg->core_clk->prepare_count,
+		motg->core_clk->count);
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 end */
+
 	/* Consider clocks on workaround flag only in case of bus suspend */
 	if (!(phy->state == OTG_STATE_B_PERIPHERAL &&
 		test_bit(A_BUS_SUSPEND, &motg->inputs)) ||
@@ -1558,6 +1573,12 @@ phcd_retry:
 		msm_hsusb_config_vddcx(0);
 		msm_hsusb_mhl_switch_enable(motg, 0);
 	}
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 begin */
+	mutex_unlock(&oem_mutex);
+	printk("[oem][usb][suspend-] prepare_count=%d, count=%d\n",
+		motg->core_clk->prepare_count,
+		motg->core_clk->count);
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 end */
 
 	if (device_may_wakeup(phy->dev)) {
 		if (motg->async_irq)
@@ -2366,6 +2387,22 @@ static bool msm_otg_read_phy_id_state(struct msm_otg *motg)
 {
 	u8 val;
 
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 begin */
+	mutex_lock(&oem_mutex);
+	printk("[oem][usb]: (%s) prepare_count=%d, count=%d\n",
+		__func__,
+		motg->core_clk->prepare_count,
+		motg->core_clk->count);
+	if (motg->core_clk->prepare_count == 0) {
+		printk("[oem][usb]: (%s) clock is off, resume it\n",
+			__func__);
+		pm_runtime_resume(motg->phy.otg->phy->dev);
+		printk("[oem][usb*]: (%s) prepare_count=%d, count=%d\n",
+			__func__,
+			motg->core_clk->prepare_count,
+			motg->core_clk->count);
+	}
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 end */
 	/*
 	 * clear the pending/outstanding interrupts and
 	 * read the ID status from the SRC_STATUS register.
@@ -2381,6 +2418,9 @@ static bool msm_otg_read_phy_id_state(struct msm_otg *motg)
 	writeb_relaxed(0x0, USB2_PHY_USB_PHY_IRQ_CMD);
 
 	val = readb_relaxed(USB2_PHY_USB_PHY_INTERRUPT_SRC_STATUS);
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 begin */
+	mutex_unlock(&oem_mutex);
+	/* added by zhangrui for qcom OTG patch HQ01982382 20160705 end */
 	if (val & USB_PHY_IDDIG_1_0)
 		return false; /* ID is grounded */
 	else
