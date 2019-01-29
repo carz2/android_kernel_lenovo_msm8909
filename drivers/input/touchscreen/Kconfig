@@ -1040,6 +1040,16 @@ config TOUCHSCREEN_GT9XX
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 
+config TOUCHSCREEN_FTS
+	bool "Focaltech touchpanel FT5626 series"
+	depends on I2C
+	help
+	  Say Y here if you have a Focaltech FT5626 touchscreen.
+	  FT5626 controllers are multi touch controllers which can
+	  report 5 touches at a time.
+
+          If unsure, say N.
+
 config TOUCHSCREEN_BU21150
 	tristate "JDI AFE BU21150"
 	depends on SPI_MASTER
