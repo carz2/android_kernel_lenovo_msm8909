@@ -78,7 +78,7 @@
  *50 Milliseconds sufficient for DSP bring up in the modem
  * after Sub System Restart
  */
-#define ADSP_STATE_READY_TIMEOUT_MS 50
+#define ADSP_STATE_READY_TIMEOUT_MS 1000//modifyed by liumx for adsp crash 20140826
 
 #define HPHL_PA_DISABLE (0x01 << 1)
 #define HPHR_PA_DISABLE (0x01 << 2)
@@ -97,6 +97,10 @@ enum {
 #define SPK_PMD 2
 #define SPK_PMU 3
 
+//add by zhuyan to enable audio basic function  SW00183968 20160203
+//Modified by chaofubang to fix handfree voice call no sound after removing headset. A6500M-280 2016-06-07 start
+int ext_spk_mode = 0;  // 1:0-1    2:0-1-0-1    3:0-1-0-1-0-1   4:0-1-0-1-0-1-0-1 (defalt: 2us; *** 0.75->10us.
+//Modified by chaofubang to fix handfree voice call no sound after removing headset. A6500M-280 2016-06-07 end
 #define MICBIAS_DEFAULT_VAL 1800000
 #define MICBIAS_MIN_VAL 1600000
 #define MICBIAS_STEP_SIZE 50000
@@ -2041,6 +2045,64 @@ static int msm8x16_wcd_pa_gain_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+static int msm8x16_wcd_ext_spk_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = ext_spk_mode;
+	dev_dbg(codec->dev, "%s: current_ext_spk_pa_state = %d\n", __func__,
+			ucontrol->value.integer.value[0] ? 1 : 0);
+	return 0;
+}
+
+static int msm8x16_wcd_ext_spk_set(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+        int i;
+	dev_info(codec->dev, "%s: ucontrol->value.integer.value[0] = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+     switch (ucontrol->value.integer.value[0]) {
+        case 0:
+            if(gpio_is_valid(ext_spk_pa_left_gpio))
+                gpio_direction_output(ext_spk_pa_left_gpio, 0);
+            if(gpio_is_valid(ext_spk_pa_right_gpio))
+                gpio_direction_output(ext_spk_pa_right_gpio, 0);
+                break;
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+                ext_spk_mode = ucontrol->value.integer.value[0];
+               if(gpio_is_valid(ext_spk_pa_left_gpio)) {
+                       for(i = 0; i <ext_spk_mode ; i++) {
+                               gpio_direction_output(ext_spk_pa_left_gpio, 0);
+                               udelay(1);
+                               gpio_direction_output(ext_spk_pa_left_gpio, 1);
+                               udelay(1);
+                       }
+               }
+               if(gpio_is_valid(ext_spk_pa_right_gpio)) {
+                       for(i = 0; i <ext_spk_mode ; i++) {
+                               gpio_direction_output(ext_spk_pa_right_gpio, 0);
+                               udelay(1);
+                               gpio_direction_output(ext_spk_pa_right_gpio, 1);
+                               udelay(1);
+                        }
+                }
+                break;
+        default:
+                return -EINVAL;
+        }
+
+       dev_info(codec->dev, "%s: current_ext_spk_pa_state = %d\n", __func__,
+                       ucontrol->value.integer.value[0] ? 1 : 0);
+
+	   return 0;
+}
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 
 static int msm8x16_wcd_boost_option_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
@@ -2411,6 +2473,13 @@ static const char * const msm8x16_wcd_spk_boost_ctrl_text[] = {
 static const struct soc_enum msm8x16_wcd_spk_boost_ctl_enum[] = {
 		SOC_ENUM_SINGLE_EXT(2, msm8x16_wcd_spk_boost_ctrl_text),
 };
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+static const char * const msm8x16_wcd_ext_spk_ctrl_text[] = {
+		"DISABLE", "ENABLE", "MODE_2", "MODE_3", "MODE_4"};
+static const struct soc_enum msm8x16_wcd_ext_spk_ctl_enum[] = {
+		SOC_ENUM_SINGLE_EXT(5, msm8x16_wcd_ext_spk_ctrl_text),
+};
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 
 static const char * const msm8x16_wcd_ext_spk_boost_ctrl_text[] = {
 		"DISABLE", "ENABLE"};
@@ -2457,6 +2526,11 @@ static const struct snd_kcontrol_new msm8x16_wcd_snd_controls[] = {
 
 	SOC_ENUM_EXT("LOOPBACK Mode", msm8x16_wcd_loopback_mode_ctl_enum[0],
 		msm8x16_wcd_loopback_mode_get, msm8x16_wcd_loopback_mode_put),
+
+    /*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+	SOC_ENUM_EXT("Speaker Ext", msm8x16_wcd_ext_spk_ctl_enum[0],
+		msm8x16_wcd_ext_spk_get, msm8x16_wcd_ext_spk_set),
+    /*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 
 	SOC_SINGLE_TLV("ADC1 Volume", MSM8X16_WCD_A_ANALOG_TX_1_EN, 3,
 					8, 0, analog_gain),

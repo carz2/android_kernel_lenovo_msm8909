@@ -61,6 +61,8 @@ extern const u8 msm8x16_wcd_reg_readonly[MSM8X16_WCD_CACHE_SIZE];
 extern const u8 msm8x16_wcd_reset_reg_defaults[MSM8X16_WCD_CACHE_SIZE];
 extern const u8 cajon_digital_reg[MSM8X16_WCD_CACHE_SIZE];
 
+extern int ext_spk_pa_left_gpio;//add by zhuyan to enable audio basic function  SW00183968 20160203
+extern int ext_spk_pa_right_gpio;//add by zhuyan to enable audio basic function  SW00183968 20160203
 enum codec_versions {
 	TOMBAK_1_0,
 	TOMBAK_2_0,
@@ -214,7 +216,10 @@ struct msm8916_asoc_mach_data {
 	int codec_type;
 	int ext_pa;
 	int us_euro_gpio;
-	int spk_ext_pa_gpio;
+	/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+	int spk_left_ext_pa_gpio;
+	int spk_right_ext_pa_gpio;
+	/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 	int mclk_freq;
 	int lb_mode;
 	u8 micbias1_cap_mode;

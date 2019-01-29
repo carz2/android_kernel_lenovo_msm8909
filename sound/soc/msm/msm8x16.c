@@ -85,6 +85,11 @@ static int msm8909_auxpcm_rate = 8000;
 
 static atomic_t quat_mi2s_clk_ref;
 static atomic_t auxpcm_mi2s_clk_ref;
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+int ext_spk_pa_left_gpio = -1;
+int ext_spk_pa_right_gpio = -1;
+extern int ext_spk_mode;
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 
 static int msm8x16_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 					bool dapm);
@@ -99,6 +104,7 @@ static void *def_tasha_mbhc_cal(void);
  * Need to report LINEIN
  * if R/L channel impedance is larger than 5K ohm
  */
+//Modify by chaofubang for some headset no button report (8916) SW00187373 2016-04-28 start
 static struct wcd_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
@@ -107,15 +113,16 @@ static struct wcd_mbhc_config mbhc_cfg = {
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = false,
 	.key_code[0] = KEY_MEDIA,
-	.key_code[1] = KEY_VOICECOMMAND,
-	.key_code[2] = KEY_VOLUMEUP,
-	.key_code[3] = KEY_VOLUMEDOWN,
+	.key_code[1] = KEY_VOLUMEUP,
+	.key_code[2] = KEY_VOLUMEDOWN,
+	.key_code[3] = 0,
 	.key_code[4] = 0,
 	.key_code[5] = 0,
 	.key_code[6] = 0,
 	.key_code[7] = 0,
 	.linein_th = 5000,
 };
+//Modify by chaofubang for some headset no button report (8916) SW00187373 2016-04-28 end
 
 static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.read_fw_bin = false,
@@ -400,15 +407,23 @@ static int msm_auxpcm_be_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
 static int enable_spk_ext_pa(struct snd_soc_codec *codec, int enable)
 {
 	struct snd_soc_card *card = codec->card;
 	struct msm8916_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 	int ret = 0;
+    int i = 0;
 
-	if (!gpio_is_valid(pdata->spk_ext_pa_gpio)) {
+	if (!gpio_is_valid(pdata->spk_left_ext_pa_gpio)) {
 		pr_err("%s: Invalid gpio: %d\n", __func__,
-			pdata->spk_ext_pa_gpio);
+			pdata->spk_left_ext_pa_gpio);
+		return -EINVAL;
+	}
+
+	if (!gpio_is_valid(pdata->spk_right_ext_pa_gpio)) {
+		pr_err("%s: Invalid gpio: %d\n", __func__,
+			pdata->spk_right_ext_pa_gpio);
 		return -EINVAL;
 	}
 
@@ -422,10 +437,24 @@ static int enable_spk_ext_pa(struct snd_soc_codec *codec, int enable)
 		return -EINVAL;
 	}
 
-	gpio_set_value_cansleep(pdata->spk_ext_pa_gpio, enable);
+	if (enable) {
+		for (i = 0; i < ext_spk_mode; ++i) {
+			gpio_set_value_cansleep(pdata->spk_left_ext_pa_gpio, 0);
+			gpio_set_value_cansleep(pdata->spk_right_ext_pa_gpio, 0);
+			udelay(1);
+			gpio_set_value_cansleep(pdata->spk_left_ext_pa_gpio, 1);
+			gpio_set_value_cansleep(pdata->spk_right_ext_pa_gpio, 1);
+			udelay(1);
+		}
+	} else {
+		gpio_set_value_cansleep(pdata->spk_left_ext_pa_gpio, 0);
+		gpio_set_value_cansleep(pdata->spk_right_ext_pa_gpio, 0);
+	}
 
 	return 0;
 }
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
+
 
 static int msm_pri_rx_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 				struct snd_pcm_hw_params *params)
@@ -595,20 +624,6 @@ static int msm_btsco_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
-static int msm_bta2dp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
-					struct snd_pcm_hw_params *params)
-{
-	struct snd_interval *rate = hw_param_interval(params,
-					SNDRV_PCM_HW_PARAM_RATE);
-
-	struct snd_interval *channels = hw_param_interval(params,
-					SNDRV_PCM_HW_PARAM_CHANNELS);
-
-	rate->min = rate->max = 48000;
-	channels->min = channels->max = 2;
-
-	return 0;
-}
 
 static int msm_proxy_rx_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 					struct snd_pcm_hw_params *params)
@@ -1623,17 +1638,20 @@ static void *def_msm8x16_wcd_mbhc_cal(void)
 	 * 210-290 == Button 2
 	 * 360-680 == Button 3
 	 */
-	btn_low[0] = 75;
-	btn_high[0] = 75;
-	btn_low[1] = 150;
-	btn_high[1] = 150;
-	btn_low[2] = 237;
-	btn_high[2] = 237;
+	//Modify by chaofubang for some headset no button report (8916) SW00187373 2016-04-28 start
+	//Modify by zhuyan to fix some button report error SW00189193 20160729 begin
+	btn_low[0] = 87;
+	btn_high[0] = 100;
+	btn_low[1] = 212;
+	btn_high[1] = 237;
+	btn_low[2] = 350;
+	btn_high[2] = 400;
 	btn_low[3] = 450;
-	btn_high[3] = 450;
-	btn_low[4] = 500;
-	btn_high[4] = 500;
-
+	btn_high[3] = 575;
+	btn_low[4] = 537;
+	btn_high[4] = 675;
+	//Modify by zhuyan to fix some button report error SW00189193 20160729 end
+	//Modify by chaofubang for some headset no button report (8916) SW00187373 2016-04-28 end
 	return msm8x16_wcd_cal;
 }
 
@@ -1914,18 +1932,6 @@ static struct snd_soc_dai_link msm8x16_wcd_dai[] = {
 		.be_id = MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
 		.be_hw_params_fixup = msm_tx_be_hw_params_fixup,
 		.ops = &msm8x16_mi2s_be_ops,
-		.ignore_suspend = 1,
-	},
-	{
-		.name = LPASS_BE_INT_BT_A2DP_RX,
-		.stream_name = "Internal BT-A2DP Playback",
-		.cpu_dai_name = "msm-dai-q6-dev.12290",
-		.platform_name = "msm-pcm-routing",
-		.codec_name = "msm-stub-codec.1",
-		.codec_dai_name = "msm-stub-rx",
-		.no_pcm = 1,
-		.be_id = MSM_BACKEND_DAI_INT_BT_A2DP_RX,
-		.be_hw_params_fixup = msm_bta2dp_be_hw_params_fixup,
 		.ignore_suspend = 1,
 	},
 };
@@ -2575,8 +2581,10 @@ static bool msm8x16_swap_gnd_mic(struct snd_soc_codec *codec)
 		pr_err("failed to configure the gpio\n");
 		return ret;
 	}
-	gpio_set_value_cansleep(pdata->us_euro_gpio, !value);
-	pr_debug("%s: swap select switch %d to %d\n", __func__, value, !value);
+	//Modify by chaofubang to be compatible with iphone OMTP headset SW00183704 2016-04-28 start
+	gpio_direction_output(pdata->us_euro_gpio, !value);
+	pr_info("%s: swap select switch %d to %d\n", __func__, value, !value);
+	//Modify by chaofubang to be compatible with iphone OMTP headset SW00183704 2016-04-28 end
 	ret = pinctrl_select_state(pinctrl_info.pinctrl,
 				pinctrl_info.cross_conn_det_sus);
 	if (ret < 0) {
@@ -2587,13 +2595,48 @@ static bool msm8x16_swap_gnd_mic(struct snd_soc_codec *codec)
 	return true;
 }
 
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+static int msm8x16_ext_spk_pa_init(struct platform_device *pdev)
+{
+	int ret = 0;
+
+	ext_spk_pa_left_gpio = of_get_named_gpio(pdev->dev.of_node,
+		"qcom,ext-spk-left-amp-gpio", 0);
+	if (gpio_is_valid(ext_spk_pa_left_gpio)) {
+		ret = gpio_request(ext_spk_pa_left_gpio, "ext_spk_pa_left_amp_gpio");
+		if (ret) {
+			pr_err("%s: gpio_request failed for ext_spk_pa_left_amp_gpio.\n",
+				__func__);
+			return -EINVAL;
+		}
+		gpio_direction_output(ext_spk_pa_left_gpio, 0);
+	}
+
+	ext_spk_pa_right_gpio = of_get_named_gpio(pdev->dev.of_node,
+	"qcom,ext-spk-right-amp-gpio", 0);
+	if (gpio_is_valid(ext_spk_pa_right_gpio)) {
+		ret = gpio_request(ext_spk_pa_right_gpio, "ext_spk_right_amp_gpio");
+		if (ret) {
+			pr_err("%s: gpio_request failed for ext_spk_right_amp_gpio.\n",
+				__func__);
+			return -EINVAL;
+		}
+		gpio_direction_output(ext_spk_pa_right_gpio, 0);
+	}
+	return 0;
+}
+/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 static int msm8x16_setup_hs_jack(struct platform_device *pdev,
 			struct msm8916_asoc_mach_data *pdata)
 {
 	struct pinctrl *pinctrl;
 
+    /*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+	msm8x16_ext_spk_pa_init(pdev);
+    /*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 	pdata->us_euro_gpio = of_get_named_gpio(pdev->dev.of_node,
 					"qcom,cdc-us-euro-gpios", 0);
+
 	if (pdata->us_euro_gpio < 0) {
 		dev_dbg(&pdev->dev,
 			"property %s in node %s not found %d\n",
@@ -2630,6 +2673,26 @@ static int msm8x16_setup_hs_jack(struct platform_device *pdev,
 	}
 	return 0;
 }
+
+//Modify by chaofubang to be compatible with iphone OMTP headset SW00183704 2016-04-28 start
+int us_eu_switch_gpio_request(struct msm8916_asoc_mach_data *pdata)
+{
+	int ret;
+	if (!gpio_is_valid(pdata->us_euro_gpio)) {
+		pr_err("%s: Invalid gpio: %d", __func__,
+				pdata->us_euro_gpio);
+		return -EINVAL;
+	} else {
+		ret = gpio_request(pdata->us_euro_gpio,
+						   "us_euro_gpio");
+		if (ret) {
+			pr_err("failed to request us_euro gpio\n");
+			return ret;
+		}
+		return 0;
+	}
+}
+//Modify by chaofubang to be compatible with iphone OMTP headset SW00183704 2016-04-28 end
 
 static void msm8x16_dt_parse_cap_info(struct platform_device *pdev,
 			struct msm8916_asoc_mach_data *pdata)
@@ -2955,7 +3018,10 @@ static int msm8x16_asoc_machine_probe(struct platform_device *pdev)
 	const char *hs_micbias_type = "qcom,msm-hs-micbias-type";
 	const char *ext_pa = "qcom,msm-ext-pa";
 	const char *mclk = "qcom,msm-mclk-freq";
-	const char *spk_ext_pa = "qcom,msm-spk-ext-pa";
+	/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+	const char *spk_left_ext_pa = "qcom,ext-spk-left-amp-gpio";
+	const char *spk_right_ext_pa = "qcom,ext-spk-right-amp-gpio";
+	/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 	const char *ptr = NULL;
 	const char *type = NULL;
 	const char *ext_pa_str = NULL;
@@ -3018,18 +3084,33 @@ static int msm8x16_asoc_machine_probe(struct platform_device *pdev)
 	}
 	pdata->mclk_freq = id;
 
-	pdata->spk_ext_pa_gpio = of_get_named_gpio(pdev->dev.of_node,
-				spk_ext_pa, 0);
-	if (pdata->spk_ext_pa_gpio < 0) {
+	/*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+	pdata->spk_left_ext_pa_gpio = of_get_named_gpio(pdev->dev.of_node,
+				spk_left_ext_pa, 0);
+	if (pdata->spk_left_ext_pa_gpio < 0) {
 		dev_dbg(&pdev->dev,
-			"%s: missing %s in dt node\n", __func__, spk_ext_pa);
+			"%s: missing %s in dt node\n", __func__, spk_left_ext_pa);
 	} else {
-		if (!gpio_is_valid(pdata->spk_ext_pa_gpio)) {
-			pr_err("%s: Invalid external speaker gpio: %d",
-				__func__, pdata->spk_ext_pa_gpio);
+		if (!gpio_is_valid(pdata->spk_left_ext_pa_gpio)) {
+			pr_err("%s: Invalid left external speaker gpio: %d",
+				__func__, pdata->spk_left_ext_pa_gpio);
 			return -EINVAL;
 		}
 	}
+
+	pdata->spk_right_ext_pa_gpio = of_get_named_gpio(pdev->dev.of_node,
+				spk_right_ext_pa, 0);
+	if (pdata->spk_right_ext_pa_gpio < 0) {
+		dev_dbg(&pdev->dev,
+			"%s: missing %s in dt node\n", __func__, spk_right_ext_pa);
+	} else {
+		if (!gpio_is_valid(pdata->spk_right_ext_pa_gpio)) {
+			pr_err("%s: Invalid right external speaker gpio: %d",
+				__func__, pdata->spk_right_ext_pa_gpio);
+			return -EINVAL;
+		}
+	}
+	/*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 
 	ret = of_property_read_string(pdev->dev.of_node, codec_type, &ptr);
 	if (ret) {
@@ -3170,6 +3251,13 @@ static int msm8x16_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
+	//Modify by chaofubang to be compatible with iphone OMTP headset SW00183704 2016-04-28 start
+	ret = us_eu_switch_gpio_request(pdata);
+	if (ret < 0)
+		pr_err("%s:  us eu switch gpio request failed\n",
+				__func__);
+	//Modify by chaofubang to be compatible with iphone OMTP headset SW00183704 2016-04-28 end
+
 	return 0;
 err:
 	if (pdata->vaddr_gpio_mux_spkr_ctl)
@@ -3192,6 +3280,12 @@ static int msm8x16_asoc_machine_remove(struct platform_device *pdev)
 		iounmap(pdata->vaddr_gpio_mux_spkr_ctl);
 	if (pdata->vaddr_gpio_mux_mic_ctl)
 		iounmap(pdata->vaddr_gpio_mux_mic_ctl);
+    /*add by zhuyan to enable audio basic function  SW00183968 20160203 begin*/
+	if (gpio_is_valid(ext_spk_pa_left_gpio))
+		gpio_free(ext_spk_pa_left_gpio);
+	if (gpio_is_valid(ext_spk_pa_right_gpio))
+		gpio_free(ext_spk_pa_left_gpio);
+    /*add by zhuyan to enable audio basic function  SW00183968 20160203 end*/
 	if (pdata->vaddr_gpio_mux_pcm_ctl)
 		iounmap(pdata->vaddr_gpio_mux_pcm_ctl);
 	snd_soc_unregister_card(card);
