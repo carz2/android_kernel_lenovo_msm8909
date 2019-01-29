@@ -77,6 +77,10 @@ dtb-$(CONFIG_ARCH_MSM8974) += msm8974-v1-cdp.dtb \
 #	apq8009-mtp-wcd9326-refboard.dtb \
 #	apq8009-512mb-mtp-wcd9326-refboard.dtb
 
+dtb-$(CONFIG_PRODUCT_AR650X) += yep-msm8909-ar650x.dtb
+dtb-$(CONFIG_PRODUCT_AR6502) += yep-msm8909-ar6502.dtb
+dtb-$(CONFIG_PRODUCT_AR6505) += yep-msm8909-ar6505.dtb
+
 dtb-$(CONFIG_ARCH_MSM8916) += msm8916-cdp.dtb \
 	msm8916-cdp-smb1360.dtb \
 	msm8916-mtp.dtb \
