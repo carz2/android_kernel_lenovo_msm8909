@@ -1785,6 +1785,7 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
 	long rc = 0;
+	uint32_t irq1_mask, irq1_status; /*Added by zhangxin for isp sub dev open failed, A650X-M, A6502M-484, 2016-07-28*/
 	ISP_DBG("%s\n", __func__);
 
 	mutex_lock(&vfe_dev->realtime_mutex);
@@ -1820,12 +1821,22 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 	rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, 1, 1);
 	if (rc <= 0) {
-		pr_err("%s: reset timeout\n", __func__);
+	/*Modified by zhangxin for isp sub dev open failed, A650X-M, A6502M-484, 2016-07-28, Begin*/
+		//pr_err("%s: reset timeout\n", __func__);
+		irq1_mask = msm_camera_io_r(vfe_dev->vfe_base + 0x20);
+		irq1_status = msm_camera_io_r(vfe_dev->vfe_base + 0x30);
+		pr_err("%s: reset timeout rc:%ld mask:%x status:%x\n", __func__, rc, irq1_mask, irq1_status);
+		if(irq1_status && BIT(23)) {
+		msm_camera_io_w_mb(irq1_status, vfe_dev->vfe_base + 0x28);
+		pr_err("%s: reset done\n", __func__);
+		} else {
 		vfe_dev->hw_info->vfe_ops.core_ops.release_hw(vfe_dev);
 		vfe_dev->vfe_open_cnt--;
 		mutex_unlock(&vfe_dev->core_mutex);
 		mutex_unlock(&vfe_dev->realtime_mutex);
 		return -EINVAL;
+		}
+	/*Modified by zhangxin for isp sub dev open failed, A650X-M, A6502M-484, 2016-07-28, End*/
 	}
 	vfe_dev->vfe_hw_version = msm_camera_io_r(vfe_dev->vfe_base);
 	ISP_DBG("%s: HW Version: 0x%x\n", __func__, vfe_dev->vfe_hw_version);
