@@ -230,6 +230,10 @@ static const char fsg_string_interface[] = "Mass Storage";
 
 #include "storage_common.c"
 
+/*add byshenxinyu for cdrom_name begin 20160225*/
+static char cdrom_name[]="Lenovo  Phone CDROM";
+static char tfcard_name[]="Lenovo  Phone TFcard";
+/*add byshenxinyu for cdrom_name end 20160225*/
 #ifdef CONFIG_USB_CSW_HACK
 static int write_error_after_csw_sent;
 static int must_report_residue;
@@ -2949,14 +2953,13 @@ buffhds_first_it:
 
 	/* Prepare inquiryString */
 	i = get_default_bcdDevice();
-	snprintf(common->inquiry_string, sizeof common->inquiry_string,
-		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
-		 /* Assume product name dependent on the first LUN */
-		 cfg->product_name ?: (common->luns->cdrom
-				     ? "File-Stor Gadget"
-				     : "File-CD Gadget"),
-		 i);
-
+	/*mod by shenxinyu for cdrom_name begin 20160225*/
+		if(cfg->product_name){
+		snprintf(common->inquiry_string, sizeof common->inquiry_string,tfcard_name);
+	}else{
+		snprintf(common->inquiry_string, sizeof common->inquiry_string,cdrom_name);
+	}
+      /*mod by shenxinyu for cdrom_name end 20160225*/
 	/*
 	 * Some peripheral controllers are known not to be able to
 	 * halt bulk endpoints correctly.  If one of them is present,
