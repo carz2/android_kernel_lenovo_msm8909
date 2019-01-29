@@ -69,6 +69,53 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev)
 	}
 	return rc;
 }
+//zwt add for error log when suspend 2015-06-01
+static int mdss_tps62561_enable(struct mdss_panel_data *pdata,int enable)
+{
+	int ret =  -EINVAL;
+	int rc =0;
+	
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+	
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		goto error;
+	}
+
+	pinfo = &pdata->panel_info;
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);	
+				
+	if(enable){
+		if (gpio_is_valid(ctrl_pdata->lcm_bias_enable)) {
+			rc = gpio_request(ctrl_pdata->lcm_bias_enable,
+                                            "lcm_bias_enable");
+                    if (rc) {
+                            pr_err("zwt ++++request lcm_bias_enable gpio failed, rc=%d\n",
+                                           rc);
+                            goto error;
+                    }
+					
+			gpio_set_value((ctrl_pdata->lcm_bias_enable), 1);
+			pr_err("[zwt]%s: reuqest successfully lcm_bias_enable is set to 1\n", __func__);
+		}
+				
+	}else{
+
+		if (gpio_is_valid(ctrl_pdata->lcm_bias_enable)){
+			gpio_set_value((ctrl_pdata->lcm_bias_enable), 0);
+			gpio_free(ctrl_pdata->lcm_bias_enable);
+			pr_info("[zwt]%s: lcm_bias_enable is set to 0\n", __func__);
+			msleep(900);   //use msleep instead  mdelay to test by xingbin
+		}			
+			
+	}
+ error:
+	return ret;
+}
+//zwt add
 
 static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 {
@@ -90,6 +137,12 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		pr_warn("%s: Panel reset failed. rc=%d\n", __func__, ret);
 		ret = 0;
 	}
+//zwt add 
+	pr_err("[zwt]+++ delay 120 then disabel bias \n");
+	mdelay(120);
+	mdss_tps62561_enable(pdata,0);
+	mdelay(10);
+	//zwt add
 
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 		pr_debug("reset disable: pinctrl not enabled\n");
@@ -163,6 +216,11 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 
 	i--;
 
+	pr_err("[zwt]+++ delay 120 then enable bias \n");
+	mdelay(5);
+	mdss_tps62561_enable(pdata,1);	
+	mdelay(5);
+	//zwt add
 	/*
 	 * If continuous splash screen feature is enabled, then we need to
 	 * request all the GPIOs that have already been configured in the
@@ -1884,7 +1942,13 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
 		pr_err("%s:%d, reset gpio not specified\n",
 						__func__, __LINE__);
+//zwt add 
+	ctrl_pdata->lcm_bias_enable = of_get_named_gpio(ctrl_pdev->dev.of_node,"qcom,lcm-bias-en-gpio", 0);
+		if (!gpio_is_valid(ctrl_pdata->lcm_bias_enable)) {
+			pr_err("%s: lcm_bias_enable not specified\n", __func__);
+		}
 
+//zwt add 
 	if (pinfo->mode_gpio_state != MODE_GPIO_NOT_VALID) {
 
 		ctrl_pdata->mode_gpio = of_get_named_gpio(

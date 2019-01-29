@@ -354,8 +354,10 @@ struct mdss_dsi_ctrl_pdata {
 	bool panel_bias_vreg;
 	bool dsi_irq_line;
 	atomic_t te_irq_ready;
-
 	bool cmd_clk_ln_recovery_en;
+//zwt add
+	int lcm_bias_enable;
+//zwt add 
 	bool cmd_sync_wait_broadcast;
 	bool cmd_sync_wait_trigger;
 

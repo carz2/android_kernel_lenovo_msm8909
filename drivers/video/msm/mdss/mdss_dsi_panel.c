@@ -34,9 +34,14 @@
 
 #define MIN_REFRESH_RATE 48
 #define DEFAULT_MDP_TRANSFER_TIME 14000
-
+int resume_flag =0 ;
 DEFINE_LED_TRIGGER(bl_led_trigger);
-
+/*zhouwentao add for code version and panel info 20150214*/
+#ifdef CONFIG_GET_HARDWARE_INFO
+#include <mach/hardware_info.h>
+static char tmp_panel_name[100];
+#endif
+/*zhouwentao add for code version and panel info 20150214*/
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	if (ctrl->pwm_pmi)
@@ -175,11 +180,12 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
-
+//added by zhouwentao for cabc begin 20150302
 static char led_pwm1[2] = {0x51, 0x0};	/* DTYPE_DCS_WRITE1 */
-static struct dsi_cmd_desc backlight_cmd = {
-	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(led_pwm1)},
-	led_pwm1
+static char led_cabc_mode[2] = {0x53, 0x2C};	/* DTYPE_DCS_WRITE1 */
+static struct dsi_cmd_desc backlight_cmd[] = {
+	{{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(led_cabc_mode)},led_cabc_mode},
+	{{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(led_pwm1)},led_pwm1},
 };
 
 static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
@@ -193,13 +199,17 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 			return;
 	}
 
-	pr_debug("%s: level=%d\n", __func__, level);
+	pr_info("%s: level=%d\n", __func__, level);
 
 	led_pwm1[1] = (unsigned char)level;
 
+	if((level >=15)&&(resume_flag !=1))
+		led_cabc_mode[1] = 0x2c;
+	else
+		led_cabc_mode[1] = 0x24;
 	memset(&cmdreq, 0, sizeof(cmdreq));
-	cmdreq.cmds = &backlight_cmd;
-	cmdreq.cmds_cnt = 1;
+	cmdreq.cmds = backlight_cmd;
+	cmdreq.cmds_cnt = 2;
 	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
@@ -207,6 +217,7 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
 
+//added by zhouwentao for cabc end 20150302
 static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int rc = 0;
@@ -541,7 +552,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_dsi_ctrl_pdata *sctrl = NULL;
-
+//added by litao for cabc begin
+	static u32 bl_level_old;
+//added by litao for cabc end
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return;
@@ -555,7 +568,16 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	 * for the backlight brightness. If the brightness is less
 	 * than it, the controller can malfunction.
 	 */
-
+//added by litao for cabc begin
+		if((bl_level>bl_level_old)&&(0==bl_level_old))
+		{
+				pr_info("%s:bl_level = %d\n",__func__,bl_level);
+				resume_flag = 1;
+		}
+		else	{
+			resume_flag = 0;
+		}
+//added by litao for cabc end	
 	if ((bl_level < pdata->panel_info.bl_min) && (bl_level != 0))
 		bl_level = pdata->panel_info.bl_min;
 
@@ -595,13 +617,16 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			__func__);
 		break;
 	}
+//added by litao for cabc begin
+	bl_level_old = bl_level;
+//added by litao for cabc end
 }
 
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
-
+	pr_err(" mdss_dsi_panel_on--S\n");
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
@@ -624,6 +649,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 end:
 	pinfo->blank_state = MDSS_PANEL_BLANK_UNBLANK;
 	pr_debug("%s:-\n", __func__);
+	pr_err(" mdss_dsi_panel_on--E\n");
 	return 0;
 }
 
@@ -667,7 +693,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
-
+	pr_err(" mdss_dsi_panel_off--S\n");
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
@@ -690,6 +716,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 end:
 	pinfo->blank_state = MDSS_PANEL_BLANK_BLANK;
 	pr_debug("%s:-\n", __func__);
+	pr_err(" mdss_dsi_panel_off--E\n");
 	return 0;
 }
 
@@ -1841,7 +1868,8 @@ int mdss_dsi_panel_init(struct device_node *node,
 	bool cmd_cfg_cont_splash)
 {
 	int rc = 0;
-	static const char *panel_name;
+	static const char *panel_name;/*zhouwentao add for code version and panel info 20150214*/
+	static const char *panel_code_version;
 	struct mdss_panel_info *pinfo;
 
 	if (!node || !ctrl_pdata) {
@@ -1861,6 +1889,22 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
 		strlcpy(&pinfo->panel_name[0], panel_name, MDSS_MAX_PANEL_LEN);
 	}
+	/*zhouwentao add for code version and panel info 20150214*/
+	panel_code_version = of_get_property(node, "qcom,mdss-dsi-panel-code-version", NULL);
+	if (!panel_code_version) {
+		pr_info("%s:%d, Panel code version specified\n",
+						__func__, __LINE__);
+	} else {
+		pr_info("%s:  Panel code version = %s\n", __func__, panel_code_version);
+	}
+
+	#if defined(CONFIG_GET_HARDWARE_INFO)
+	strlcpy(tmp_panel_name, panel_name,100);
+	strlcat(tmp_panel_name,panel_code_version,100);
+	register_hardware_info(LCM, tmp_panel_name);
+	#endif
+
+	/*zhouwentao add for code version and panel info 20150214*/
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {
 		pr_err("%s:%d panel dt parse failed\n", __func__, __LINE__);
