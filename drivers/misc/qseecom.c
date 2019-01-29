@@ -230,6 +230,7 @@ struct qseecom_key_id_usage_desc {
 	uint8_t desc[QSEECOM_KEY_ID_SIZE];
 };
 
+/* Modified by wanghao to fix decrypt fail after ota. (650X) A6502M-553 2016-08-04 begin */
 static struct qseecom_key_id_usage_desc key_id_array[] = {
 	{
 		.desc = "Undefined Usage Index",
@@ -242,15 +243,8 @@ static struct qseecom_key_id_usage_desc key_id_array[] = {
 	{
 		.desc = "Per File Encryption",
 	},
-
-	{
-		.desc = "UFS ICE Full Disk Encryption",
-	},
-
-	{
-		.desc = "SDCC ICE Full Disk Encryption",
-	},
 };
+/* Modified by wanghao to fix decrypt fail after ota. (650X) A6502M-553 2016-08-04 end */
 
 /* Function proto types */
 static int qsee_vote_for_clock(struct qseecom_dev_handle *, int32_t);
