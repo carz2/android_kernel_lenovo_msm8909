@@ -47,6 +47,9 @@ static uint disable_restart_work;
 module_param(disable_restart_work, uint, S_IRUGO | S_IWUSR);
 
 static int enable_debug;
+/*< SW00188113 liumaoxin 20160307 start>*/
+static int subsys_restart_level= 0;
+/*< SW00188113 liumaoxin 20160307 end>*/
 module_param(enable_debug, int, S_IRUGO | S_IWUSR);
 
 /* The maximum shutdown timeout is the product of MAX_LOOPS and DELAY_MS. */
@@ -225,6 +228,9 @@ static ssize_t restart_level_store(struct device *dev,
 	for (i = 0; i < ARRAY_SIZE(restart_levels); i++)
 		if (!strncasecmp(buf, restart_levels[i], count)) {
 			subsys->restart_level = i;
+			/*< SW00188113 liumaoxin 20160307 start>*/
+			subsys_restart_level = subsys->restart_level;
+			/*< SW00188113 liumaoxin 20160307 end>*/
 			return count;
 		}
 	return -EPERM;
@@ -929,6 +935,9 @@ int subsystem_restart_dev(struct subsys_device *dev)
 	}
 
 	name = dev->desc->name;
+	/*< SW00188113 liumaoxin 20160307 start>*/
+	dev->restart_level = subsys_restart_level;
+	/*< SW00188113 liumaoxin 20160307 end>*/
 
 	/*
 	 * If a system reboot/shutdown is underway, ignore subsystem errors.

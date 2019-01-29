@@ -20,8 +20,10 @@
 struct subsys_device;
 
 enum {
-	RESET_SOC = 0,
-	RESET_SUBSYS_COUPLED,
+	/*< SW00188113 liumaoxin 20160307 start>*/
+	RESET_SUBSYS_COUPLED = 0,
+	RESET_SOC,
+	/*< SW00188113 liumaoxin 20160307 end>*/
 	RESET_LEVEL_MAX
 };
 
