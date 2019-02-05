@@ -5726,7 +5726,7 @@
 				vio-supply = <0x91>;
 				kionix,min-interval = <0x5>;
 				kionix,poll_interval = <0x64>;
-				kionix,accel_direction = <0x7>;
+				kionix,accel_direction = <0x6>;
 				kionix,accel_irq_use_drdy = <0x0>;
 				kionix,accel_res = <0xc>;
 				kionix,accel_g_range = <0x2>;
